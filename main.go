@@ -27,7 +27,7 @@ func drawInfiniteGridLines(camera rl.Camera2D, canvasW float32, canvasH float32,
 	for x := float32(0.0); x <= cellSize*float32(width); x += cellSize {
 		rl.DrawLineEx(
 			rl.NewVector2(x, 0),
-			rl.NewVector2(x, cellSize*float32(width)),
+			rl.NewVector2(x, cellSize*float32(height)),
 			lineThickness,
 			lineColor,
 		)
@@ -39,7 +39,7 @@ func drawInfiniteGridLines(camera rl.Camera2D, canvasW float32, canvasH float32,
 	for y := float32(0.0); y <= cellSize*float32(height); y += cellSize {
 		rl.DrawLineEx(
 			rl.NewVector2(0, y),
-			rl.NewVector2(cellSize*float32(height), y),
+			rl.NewVector2(cellSize*float32(width), y),
 			lineThickness,
 			lineColor,
 		)
@@ -48,7 +48,7 @@ func drawInfiniteGridLines(camera rl.Camera2D, canvasW float32, canvasH float32,
 
 func main() {
 	rl.SetConfigFlags(rl.FlagWindowResizable)
-	rl.InitWindow(int32(800), int32(450), "Raylib - Wayland Safe Zoom & Resize")
+	rl.InitWindow(int32(800), int32(450), "A* Visualizer")
 	defer rl.CloseWindow()
 
 	scale := rl.GetWindowScaleDPI().X
