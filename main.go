@@ -11,26 +11,39 @@ func canvasMouse() rl.Vector2 {
 	return rl.GetMousePosition()
 }
 
-func drawGrid(grid [][]int, lineThickness float32) {
-	if lineThickness > 5 {
-		lineThickness = 0
+func drawInfiniteGridLines(camera rl.Camera2D, canvasW float32, canvasH float32, cellSize float32, width int, height int) {
+	// 1. Level of Detail (LOD) Check
+	// If we are zoomed out too far, don't draw the gridlines at all
+	if camera.Zoom < 0.4 {
+		return
 	}
-	for i := 0; i < len(grid); i++ {
-		for j := 0; j < len(grid[i]); j++ {
-			rl.DrawRectangle(int32(i*25), int32(j*25), 25, 25, rl.NewColor(240, 240, 240, 255))
-			if lineThickness > 0 {
-				rl.DrawRectangleLinesEx(rl.NewRectangle(float32(i*25), float32(j*25), 25, 25), lineThickness, rl.Black)
-			}
-		}
-	}
-}
 
-func generateGrid(width int, height int) [][]int {
-	grid := make([][]int, width)
-	for i := range grid {
-		grid[i] = make([]int, height)
+	lineThickness := 1.0 / camera.Zoom
+	lineColor := rl.NewColor(200, 200, 200, 255) // Light gray so it's not distracting
+
+	// 2. Draw Vertical Lines
+	// Start at the left edge of the screen, draw a line from top to bottom,
+	// step right by cellSize, repeat until off the right edge.
+	for x := float32(0.0); x <= cellSize*float32(width); x += cellSize {
+		rl.DrawLineEx(
+			rl.NewVector2(x, 0),
+			rl.NewVector2(x, cellSize*float32(width)),
+			lineThickness,
+			lineColor,
+		)
 	}
-	return grid
+
+	// 3. Draw Horizontal Lines
+	// Start at the top edge of the screen, draw a line from left to right,
+	// step down by cellSize, repeat until off the bottom edge.
+	for y := float32(0.0); y <= cellSize*float32(height); y += cellSize {
+		rl.DrawLineEx(
+			rl.NewVector2(0, y),
+			rl.NewVector2(cellSize*float32(height), y),
+			lineThickness,
+			lineColor,
+		)
+	}
 }
 
 func main() {
@@ -61,7 +74,12 @@ func main() {
 	editModeWidth := false
 	editModeHeight := false
 
-	grid := generateGrid(width, height)
+	cellSize := float32(25)
+
+	mapImage := rl.GenImageColor(width, height, rl.NewColor(240, 240, 240, 255))
+	mapTexture := rl.LoadTextureFromImage(mapImage)
+	defer rl.UnloadTexture(mapTexture)
+	defer rl.UnloadImage(mapImage)
 
 	for !rl.WindowShouldClose() {
 		screenWidth := float32(rl.GetScreenWidth())
@@ -84,8 +102,8 @@ func main() {
 
 			// 2. Apply the zoom
 			camera.Zoom += float32(wheel) * 0.1
-			if camera.Zoom < 0.1 {
-				camera.Zoom = 0.1
+			if camera.Zoom < 0.01 {
+				camera.Zoom = 0.01
 			}
 
 			// 3. Where does that same screen pixel point to AFTER zooming?
@@ -110,7 +128,14 @@ func main() {
 		// 1. Draw Canvas
 		rl.BeginScissorMode(0, 0, int32(canvasWidth), int32(screenHeight))
 		rl.BeginMode2D(camera)
-		drawGrid(grid, 1/camera.Zoom)
+		rl.DrawTextureEx(
+			mapTexture,
+			rl.NewVector2(0, 0), // Position
+			0.0,                 // Rotation
+			cellSize,            // Scale factor
+			rl.White,            // Tint (White means no tint)
+		)
+		drawInfiniteGridLines(camera, canvasWidth, screenHeight, cellSize, width, height)
 		rl.EndMode2D()
 		rl.EndScissorMode()
 
@@ -136,7 +161,10 @@ func main() {
 		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (40*scale), (180*scale), (30*scale)), "Generate Grid") {
 			width, _ = strconv.Atoi(widthInputValue)
 			height, _ = strconv.Atoi(heightInputValue)
-			grid = generateGrid(width, height)
+			mapImage = rl.GenImageColor(width, height, rl.NewColor(240, 240, 240, 255))
+			mapTexture = rl.LoadTextureFromImage(mapImage)
+			defer rl.UnloadTexture(mapTexture)
+			defer rl.UnloadImage(mapImage)
 		}
 
 		rl.EndDrawing()
