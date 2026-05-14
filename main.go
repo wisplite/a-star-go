@@ -380,6 +380,7 @@ func main() {
 							if startPos.X >= 0 && startPos.Y >= 0 {
 								ox, oy := int(startPos.X), int(startPos.Y)
 								rl.ImageDrawPixel(mapImage, int32(startPos.X), int32(startPos.Y), rl.NewColor(240, 240, 240, 255))
+								astar.SetGridType(ox, oy, 0)
 								tex.markRegion(ox, oy, ox, oy, width, height)
 							}
 							rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 255, 0, 255))
@@ -392,6 +393,7 @@ func main() {
 							if endPos.X >= 0 && endPos.Y >= 0 {
 								ox, oy := int(endPos.X), int(endPos.Y)
 								rl.ImageDrawPixel(mapImage, int32(endPos.X), int32(endPos.Y), rl.NewColor(240, 240, 240, 255))
+								astar.SetGridType(ox, oy, 0)
 								tex.markRegion(ox, oy, ox, oy, width, height)
 							}
 							rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(255, 0, 0, 255))
@@ -553,6 +555,9 @@ func main() {
 			}
 			tex.markFull()
 		}
+
+		// Status Label
+		rg.Label(rl.NewRectangle((10*scale), (screenHeight-(30*scale)), (180*scale), (30*scale)), "Evaluated "+strconv.Itoa(astar.GetEvaluatedCells())+" cells in "+astar.GetTimeTaken().String())
 
 		rl.EndDrawing()
 	}

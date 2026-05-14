@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"fmt"
 	"math"
+	"time"
 )
 
 type Item struct {
@@ -52,6 +53,7 @@ type AStar struct {
 	width     int
 	height    int
 	heuristic func(x int, y int, endX int, endY int) float32
+	timeTaken time.Duration
 }
 
 func (a *AStar) Init(width int, height int) {
@@ -195,7 +197,25 @@ func (a *AStar) GetTerrainCost(x int, y int) float32 {
 	return 1.0
 }
 
+func (a *AStar) GetEvaluatedCells() int {
+	cellsEvaluated := 0
+	for _, closed := range a.closedSet {
+		if closed {
+			cellsEvaluated++
+		}
+	}
+	return cellsEvaluated
+}
+
+func (a *AStar) GetTimeTaken() time.Duration {
+	return a.timeTaken
+}
+
 func (a *AStar) CalculatePath(startX int, startY int, endX int, endY int) [][]int {
+	timer := time.Now()
+	defer func() {
+		a.timeTaken = time.Since(timer)
+	}()
 	startIndex := startY*a.width + startX
 	endIndex := endY*a.width + endX
 	a.gScores[startIndex] = 0
