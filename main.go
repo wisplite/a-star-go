@@ -265,7 +265,7 @@ func drawInfiniteGridLines(camera rl.Camera2D, canvasW float32, canvasH float32,
 
 func main() {
 	rl.SetConfigFlags(rl.FlagWindowResizable)
-	rl.InitWindow(int32(800), int32(450), "A* Visualizer")
+	rl.InitWindow(int32(800), int32(600), "A* Visualizer")
 	defer rl.CloseWindow()
 
 	scale := rl.GetWindowScaleDPI().X + 0.25
@@ -314,6 +314,8 @@ func main() {
 	mapTexture := rl.LoadTextureFromImage(mapImage)
 	defer rl.UnloadTexture(mapTexture)
 	defer rl.UnloadImage(mapImage)
+
+	autoCompute := false
 
 	astar := AStar{}
 	astar.Init(width, height)
@@ -419,6 +421,42 @@ func main() {
 		}
 
 		if rl.IsMouseButtonReleased(rl.MouseLeftButton) {
+			if autoCompute && lastMousePos.X != -1 && lastMousePos.Y != -1 && int(startPos.X) >= 0 && int(startPos.X) < width && int(startPos.Y) >= 0 && int(startPos.Y) < height && int(endPos.X) >= 0 && int(endPos.X) < width && int(endPos.Y) >= 0 && int(endPos.Y) < height {
+				astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
+				gridTypes := astar.GetGridTypes()
+				for i, gridType := range gridTypes {
+					// reset the map image
+					switch gridType {
+					case 0:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(240, 240, 240, 255))
+					case 1:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 0, 0, 255))
+					case 2:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 255, 0, 255))
+					case 3:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(255, 0, 0, 255))
+					}
+				}
+				tex.markFull()
+				astar.SetHeuristic(activeHeuristic)
+				path := astar.CalculatePath(int(startPos.X), int(startPos.Y), int(endPos.X), int(endPos.Y))
+				closedSet := astar.GetClosedSet()
+				for i, closed := range closedSet {
+					if closed {
+						x := i % width
+						y := i / width
+						if x != int(startPos.X) || y != int(startPos.Y) {
+							rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 0, 255, 255))
+						}
+					}
+				}
+				for _, p := range path {
+					if p[0] != int(startPos.X) || p[1] != int(startPos.Y) { // we want to keep the start position green
+						rl.ImageDrawPixel(mapImage, int32(p[0]), int32(p[1]), rl.NewColor(255, 255, 0, 255))
+					}
+				}
+				tex.markFull()
+			}
 			lastMousePos = rl.NewVector2(-1, -1)
 		}
 
@@ -509,27 +547,32 @@ func main() {
 		}
 
 		// Reset Visualization Button
-		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(80*scale)), (180*scale), (30*scale)), "Reset Visualization") {
-			astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
-			gridTypes := astar.GetGridTypes()
-			for i, gridType := range gridTypes {
-				// reset the map image
-				switch gridType {
-				case 0:
-					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(240, 240, 240, 255))
-				case 1:
-					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 0, 0, 255))
-				case 2:
-					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 255, 0, 255))
-				case 3:
-					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(255, 0, 0, 255))
+		if !toolDropdownOpen && !heuristicDropdownOpen {
+			if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (200*scale), (180*scale), (30*scale)), "Reset Visualization") {
+				astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
+				gridTypes := astar.GetGridTypes()
+				for i, gridType := range gridTypes {
+					// reset the map image
+					switch gridType {
+					case 0:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(240, 240, 240, 255))
+					case 1:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 0, 0, 255))
+					case 2:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 255, 0, 255))
+					case 3:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(255, 0, 0, 255))
+					}
 				}
+				tex.markFull()
 			}
-			tex.markFull()
 		}
 
+		// AutoCompute
+		autoCompute = rg.CheckBox(rl.NewRectangle(sidebarX+(160*scale), (screenHeight-(40*scale)), (30*scale), (30*scale)), "", autoCompute) // no title because it would overlap the button
+
 		// Calculate Path Button
-		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(40*scale)), (180*scale), (30*scale)), "Calculate Path") {
+		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(40*scale)), (140*scale), (30*scale)), "Calculate Path") {
 			if int(startPos.X) < 0 || int(startPos.X) >= width || int(startPos.Y) < 0 || int(startPos.Y) >= height || int(endPos.X) < 0 || int(endPos.X) >= width || int(endPos.Y) < 0 || int(endPos.Y) >= height {
 				posError = true
 			} else {
