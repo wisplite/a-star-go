@@ -128,6 +128,10 @@ func (a *AStar) GetGridTypes() []byte {
 	return a.gridTypes
 }
 
+func (a *AStar) GetClosedSet() []bool {
+	return a.closedSet
+}
+
 func (a *AStar) SetGScores(x int, y int, gScore float32) {
 	a.gScores[y*a.width+x] = gScore
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
 	"strconv"
 	"strings"
@@ -537,7 +536,16 @@ func main() {
 				}
 			}
 			path := astar.CalculatePath(int(startPos.X), int(startPos.Y), int(endPos.X), int(endPos.Y))
-			fmt.Println(path)
+			closedSet := astar.GetClosedSet()
+			for i, closed := range closedSet {
+				if closed {
+					x := i % width
+					y := i / width
+					if x != int(startPos.X) || y != int(startPos.Y) {
+						rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 0, 255, 255))
+					}
+				}
+			}
 			for _, p := range path {
 				if p[0] != int(startPos.X) || p[1] != int(startPos.Y) { // we want to keep the start position green
 					rl.ImageDrawPixel(mapImage, int32(p[0]), int32(p[1]), rl.NewColor(255, 255, 0, 255))
