@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 )
 
@@ -51,6 +52,7 @@ type AStar struct {
 	gridTypes []byte
 	gScores   []float32
 	parents   []byte
+	parentsMu sync.RWMutex // live preview reads parents from the UI thread while CalculatePathLive writes
 	openSet   PriorityQueue
 	closedSet []bool
 	width     int
@@ -74,9 +76,11 @@ func (a *AStar) Init(width int, height int) {
 	for i := range a.gScores {
 		a.gScores[i] = math.MaxFloat32
 	}
+	a.parentsMu.Lock()
 	for i := range a.parents {
 		a.parents[i] = parentNone
 	}
+	a.parentsMu.Unlock()
 }
 
 func (a *AStar) ResetGrid(withTypes bool) {
@@ -85,15 +89,20 @@ func (a *AStar) ResetGrid(withTypes bool) {
 			a.gridTypes[i] = 0
 		}
 		a.gScores[i] = math.MaxFloat32
-		a.parents[i] = parentNone
 		a.closedSet[i] = false
 	}
+	a.parentsMu.Lock()
+	for i := range a.parents {
+		a.parents[i] = parentNone
+	}
+	a.parentsMu.Unlock()
 	a.openSet = a.openSet[:0]
 }
 
 func (a *AStar) RebuildGrid(width int, height int) {
 	a.gridTypes = make([]byte, width*height)
 	a.gScores = make([]float32, width*height)
+	a.parentsMu.Lock()
 	a.parents = make([]byte, width*height)
 	a.openSet = make(PriorityQueue, 0, 2000000)
 	a.closedSet = make([]bool, width*height)
@@ -102,6 +111,7 @@ func (a *AStar) RebuildGrid(width int, height int) {
 	for i := range a.parents {
 		a.parents[i] = parentNone
 	}
+	a.parentsMu.Unlock()
 }
 
 func (a *AStar) SetHeuristic(heuristic int32) {
@@ -116,7 +126,7 @@ func (a *AStar) SetHeuristic(heuristic int32) {
 		}
 	case 2:
 		a.heuristic = func(x int, y int, endX int, endY int) float32 {
-			return float32(math.Max(float64(x-endX), float64(y-endY))) // Chebyshev distance
+			return float32(math.Max(math.Abs(float64(x-endX)), math.Abs(float64(y-endY)))) // Chebyshev: max(|dx|, |dy|)
 		}
 	case 3:
 		a.heuristic = func(x int, y int, endX int, endY int) float32 {
@@ -156,6 +166,8 @@ func (a *AStar) GetGScores(x int, y int) float32 {
 }
 
 func (a *AStar) SetParent(x int, y int, parentx int, parenty int) {
+	a.parentsMu.Lock()
+	defer a.parentsMu.Unlock()
 	if parentx < x {
 		a.parents[y*a.width+x] = byte(0) // left of the node
 	} else if parentx > x {
@@ -168,11 +180,17 @@ func (a *AStar) SetParent(x int, y int, parentx int, parenty int) {
 }
 
 func (a *AStar) GetParent(x int, y int) byte {
+	a.parentsMu.RLock()
+	defer a.parentsMu.RUnlock()
 	return a.parents[y*a.width+x]
 }
 
-func (a *AStar) GetParents() []byte {
-	return a.parents
+func (a *AStar) ParentsSnapshot() []byte {
+	a.parentsMu.RLock()
+	defer a.parentsMu.RUnlock()
+	out := make([]byte, len(a.parents))
+	copy(out, a.parents)
+	return out
 }
 
 func (a *AStar) ParentIndexToXY(childx int, childy int, parent byte) (int, int) {
@@ -253,6 +271,7 @@ func (a *AStar) CalculatePath(startX int, startY int, endX int, endY int) [][]in
 			// We've found the goal!
 			fmt.Println("Found the goal!")
 			path := make([][]int, 0)
+			a.parentsMu.RLock()
 			for currentIndex := current.index; currentIndex != startIndex; {
 				p := a.parents[currentIndex]
 				next := a.ParentIndexToXYIndex(currentIndex%a.width, currentIndex/a.width, p)
@@ -263,6 +282,7 @@ func (a *AStar) CalculatePath(startX int, startY int, endX int, endY int) [][]in
 				path = append(path, []int{x, y})
 				currentIndex = next
 			}
+			a.parentsMu.RUnlock()
 			return path
 		}
 
@@ -309,6 +329,7 @@ func (a *AStar) CalculatePathLive(startX int, startY int, endX int, endY int, up
 			// We've found the goal!
 			fmt.Println("Found the goal!")
 			path := make([][]int, 0)
+			a.parentsMu.RLock()
 			for currentIndex := current.index; currentIndex != startIndex; {
 				p := a.parents[currentIndex]
 				next := a.ParentIndexToXYIndex(currentIndex%a.width, currentIndex/a.width, p)
@@ -319,6 +340,7 @@ func (a *AStar) CalculatePathLive(startX int, startY int, endX int, endY int, up
 				path = append(path, []int{x, y})
 				currentIndex = next
 			}
+			a.parentsMu.RUnlock()
 			return path
 		}
 

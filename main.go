@@ -516,7 +516,7 @@ func main() {
 		// 2. Trace parent chain and draw a yellow polyline (cell centers) each frame.
 		if lastEvaluatedNode != -1 {
 			startIndex := int(startPos.Y)*width + int(startPos.X)
-			parents := astar.GetParents()
+			parents := astar.ParentsSnapshot()
 			pathThickness := float32(16.0)
 			if pathThickness < 1 {
 				pathThickness = 1
