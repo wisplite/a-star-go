@@ -60,7 +60,7 @@ func (a *AStar) Init(width int, height int) {
 	a.gridTypes = make([]byte, width*height)
 	a.gScores = make([]float32, width*height)
 	a.parents = make([]byte, width*height)
-	a.openSet = make(PriorityQueue, 0)
+	a.openSet = make(PriorityQueue, 0, 2000000) // pre-allocate space for 2 million cells to avoid reallocations
 	a.closedSet = make([]bool, width*height)
 	a.heuristic = func(x int, y int, endX int, endY int) float32 {
 		return float32(math.Abs(float64(x-endX)) + math.Abs(float64(y-endY))) // Manhattan distance default
@@ -89,7 +89,7 @@ func (a *AStar) RebuildGrid(width int, height int) {
 	a.gridTypes = make([]byte, width*height)
 	a.gScores = make([]float32, width*height)
 	a.parents = make([]byte, width*height)
-	a.openSet = make(PriorityQueue, 0)
+	a.openSet = make(PriorityQueue, 0, 2000000)
 	a.closedSet = make([]bool, width*height)
 	a.width = width
 	a.height = height
