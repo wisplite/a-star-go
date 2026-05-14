@@ -315,10 +315,15 @@ func main() {
 	defer rl.UnloadTexture(mapTexture)
 	defer rl.UnloadImage(mapImage)
 
+	updateChan := make(chan int, 100000)
+
 	autoCompute := false
 
 	astar := AStar{}
 	astar.Init(width, height)
+
+	// Above the channel loop
+	lastEvaluatedNode := -1 // Track the "tip of the spear"
 
 	for !rl.WindowShouldClose() {
 		screenWidth := float32(rl.GetScreenWidth())
@@ -459,6 +464,30 @@ func main() {
 			}
 			lastMousePos = rl.NewVector2(-1, -1)
 		}
+		updatesProcessed := 0
+	DrainLoop: // Use a label so we can break out of the infinite 'for' loop
+		for {
+			select {
+			case nodeIndex := <-updateChan:
+				x := nodeIndex % width
+				y := nodeIndex / width
+				if x != int(startPos.X) || y != int(startPos.Y) {
+					// Bake the blue pixel into the image
+					rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 0, 255, 255))
+					tex.markRegion(x, y, x, y, width, height)
+				}
+
+				lastEvaluatedNode = nodeIndex // Save the absolute latest node
+				updatesProcessed++
+
+				if updatesProcessed > 50000 {
+					break DrainLoop
+				}
+			default:
+				// Channel is empty
+				break DrainLoop
+			}
+		}
 
 		// --- DRAWING ---
 		rl.BeginDrawing()
@@ -475,6 +504,42 @@ func main() {
 			cellSize,            // Scale factor
 			rl.White,            // Tint (White means no tint)
 		)
+
+		// 2. Trace parent chain and draw a yellow polyline (cell centers) each frame.
+		if lastEvaluatedNode != -1 {
+			startIndex := int(startPos.Y)*width + int(startPos.X)
+			parents := astar.GetParents()
+			pathThickness := float32(10.0) / (camera.Zoom / 0.75)
+			if pathThickness < 1 {
+				pathThickness = 1
+			}
+			pathColor := rl.NewColor(255, 255, 0, 255)
+
+			var centers []rl.Vector2
+			for idx := lastEvaluatedNode; idx >= 0 && idx < width*height && idx != startIndex; {
+				cx := (float32(idx%width) + 0.5) * cellSize
+				cy := (float32(idx/width) + 0.5) * cellSize
+				centers = append(centers, rl.NewVector2(cx, cy))
+
+				if idx == startIndex {
+					break
+				}
+				p := parents[idx]
+				if p == parentNone {
+					break
+				}
+				next := astar.ParentIndexToXYIndex(idx%width, idx/width, p)
+				if next < 0 || next == idx {
+					break
+				}
+				idx = next
+			}
+
+			for i := 0; i < len(centers)-1; i++ {
+				rl.DrawLineEx(centers[i], centers[i+1], pathThickness, pathColor)
+			}
+		}
+
 		drawInfiniteGridLines(camera, canvasWidth, screenHeight, cellSize, width, height)
 		rl.EndMode2D()
 		rl.EndScissorMode()
@@ -550,6 +615,7 @@ func main() {
 		if !toolDropdownOpen && !heuristicDropdownOpen {
 			if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (200*scale), (180*scale), (30*scale)), "Reset Visualization") {
 				astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
+				lastEvaluatedNode = -1
 				gridTypes := astar.GetGridTypes()
 				for i, gridType := range gridTypes {
 					// reset the map image
@@ -568,6 +634,34 @@ func main() {
 			}
 		}
 
+		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(80*scale)), (180*scale), (30*scale)), "Calculate Path (Live)") {
+			if int(startPos.X) < 0 || int(startPos.X) >= width || int(startPos.Y) < 0 || int(startPos.Y) >= height || int(endPos.X) < 0 || int(endPos.X) >= width || int(endPos.Y) < 0 || int(endPos.Y) >= height {
+				posError = true
+			} else {
+				astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
+				astar.SetHeuristic(activeHeuristic)
+				lastEvaluatedNode = -1
+				gridTypes := astar.GetGridTypes()
+				for i, gridType := range gridTypes {
+					// reset the map image
+					switch gridType {
+					case 0:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(240, 240, 240, 255))
+					case 1:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 0, 0, 255))
+					case 2:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 255, 0, 255))
+					case 3:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(255, 0, 0, 255))
+					}
+				}
+				tex.markFull()
+				go func() {
+					astar.CalculatePathLive(int(startPos.X), int(startPos.Y), int(endPos.X), int(endPos.Y), updateChan)
+				}()
+			}
+		}
+
 		// AutoCompute
 		autoCompute = rg.CheckBox(rl.NewRectangle(sidebarX+(160*scale), (screenHeight-(40*scale)), (30*scale), (30*scale)), "", autoCompute) // no title because it would overlap the button
 
@@ -578,6 +672,7 @@ func main() {
 			} else {
 				astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
 				astar.SetHeuristic(activeHeuristic)
+				lastEvaluatedNode = -1
 				gridTypes := astar.GetGridTypes()
 				for i, gridType := range gridTypes {
 					// reset the map image

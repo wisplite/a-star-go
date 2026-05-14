@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// parentNone marks cells with no predecessor; must not collide with 0–3 (cardinal directions).
+const parentNone byte = 0xff
+
 type Item struct {
 	index    int     // index of the cell in the grid (y * width + x)
 	priority float32 // f = g + h
@@ -71,6 +74,9 @@ func (a *AStar) Init(width int, height int) {
 	for i := range a.gScores {
 		a.gScores[i] = math.MaxFloat32
 	}
+	for i := range a.parents {
+		a.parents[i] = parentNone
+	}
 }
 
 func (a *AStar) ResetGrid(withTypes bool) {
@@ -79,7 +85,7 @@ func (a *AStar) ResetGrid(withTypes bool) {
 			a.gridTypes[i] = 0
 		}
 		a.gScores[i] = math.MaxFloat32
-		a.parents[i] = 0
+		a.parents[i] = parentNone
 		a.closedSet[i] = false
 	}
 	a.openSet = a.openSet[:0]
@@ -93,6 +99,9 @@ func (a *AStar) RebuildGrid(width int, height int) {
 	a.closedSet = make([]bool, width*height)
 	a.width = width
 	a.height = height
+	for i := range a.parents {
+		a.parents[i] = parentNone
+	}
 }
 
 func (a *AStar) SetHeuristic(heuristic int32) {
@@ -162,21 +171,30 @@ func (a *AStar) GetParent(x int, y int) byte {
 	return a.parents[y*a.width+x]
 }
 
+func (a *AStar) GetParents() []byte {
+	return a.parents
+}
+
 func (a *AStar) ParentIndexToXY(childx int, childy int, parent byte) (int, int) {
-	if parent == 0 {
+	switch parent {
+	case 0:
 		return childx - 1, childy // parent left
-	} else if parent == 1 {
+	case 1:
 		return childx, childy - 1 // parent above
-	} else if parent == 2 {
+	case 2:
 		return childx + 1, childy // parent right
-	} else if parent == 3 {
+	case 3:
 		return childx, childy + 1 // parent below
+	default:
+		return -1, -1
 	}
-	return childx, childy
 }
 
 func (a *AStar) ParentIndexToXYIndex(childx int, childy int, parent byte) int {
 	x, y := a.ParentIndexToXY(childx, childy, parent)
+	if x < 0 || y < 0 || x >= a.width || y >= a.height {
+		return -1
+	}
 	return y*a.width + x
 }
 
@@ -235,14 +253,77 @@ func (a *AStar) CalculatePath(startX int, startY int, endX int, endY int) [][]in
 			// We've found the goal!
 			fmt.Println("Found the goal!")
 			path := make([][]int, 0)
-			for currentIndex := current.index; currentIndex != startIndex; currentIndex = a.ParentIndexToXYIndex(currentIndex%a.width, currentIndex/a.width, a.parents[currentIndex]) {
-				x, y := a.ParentIndexToXY(currentIndex%a.width, currentIndex/a.width, a.parents[currentIndex])
+			for currentIndex := current.index; currentIndex != startIndex; {
+				p := a.parents[currentIndex]
+				next := a.ParentIndexToXYIndex(currentIndex%a.width, currentIndex/a.width, p)
+				if next < 0 {
+					break
+				}
+				x, y := a.ParentIndexToXY(currentIndex%a.width, currentIndex/a.width, p)
 				path = append(path, []int{x, y})
+				currentIndex = next
 			}
 			return path
 		}
 
 		a.closedSet[current.index] = true
+
+		for _, neighborIndex := range a.GetNeighbors(current.index%a.width, current.index/a.width) {
+			if a.closedSet[neighborIndex] {
+				continue
+			}
+			if a.gridTypes[neighborIndex] == 1 {
+				a.gScores[neighborIndex] = math.MaxFloat32
+				continue
+			}
+			terrainCost := a.GetTerrainCost(neighborIndex%a.width, neighborIndex/a.width)
+			tentativeGScore := a.gScores[current.index] + terrainCost
+			if tentativeGScore < a.gScores[neighborIndex] {
+				a.SetParent(neighborIndex%a.width, neighborIndex/a.width, current.index%a.width, current.index/a.width)
+				a.gScores[neighborIndex] = tentativeGScore
+				priority := tentativeGScore + a.heuristic(neighborIndex%a.width, neighborIndex/a.width, endX, endY)
+				heap.Push(&a.openSet, &Item{index: neighborIndex, priority: priority, gScore: tentativeGScore})
+			}
+		}
+	}
+	return make([][]int, 0)
+}
+
+func (a *AStar) CalculatePathLive(startX int, startY int, endX int, endY int, updateChan chan int) [][]int {
+	timer := time.Now()
+	defer func() {
+		a.timeTaken = time.Since(timer)
+	}()
+	startIndex := startY*a.width + startX
+	endIndex := endY*a.width + endX
+	a.gScores[startIndex] = 0
+	startF := a.heuristic(startX, startY, endX, endY)
+	heap.Push(&a.openSet, &Item{index: startIndex, priority: startF, gScore: 0})
+
+	for a.openSet.Len() > 0 {
+		current := heap.Pop(&a.openSet).(*Item)
+		if a.closedSet[current.index] {
+			continue
+		}
+		if current.index == endIndex {
+			// We've found the goal!
+			fmt.Println("Found the goal!")
+			path := make([][]int, 0)
+			for currentIndex := current.index; currentIndex != startIndex; {
+				p := a.parents[currentIndex]
+				next := a.ParentIndexToXYIndex(currentIndex%a.width, currentIndex/a.width, p)
+				if next < 0 {
+					break
+				}
+				x, y := a.ParentIndexToXY(currentIndex%a.width, currentIndex/a.width, p)
+				path = append(path, []int{x, y})
+				currentIndex = next
+			}
+			return path
+		}
+
+		a.closedSet[current.index] = true
+		updateChan <- current.index
 
 		for _, neighborIndex := range a.GetNeighbors(current.index%a.width, current.index/a.width) {
 			if a.closedSet[neighborIndex] {
