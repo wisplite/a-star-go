@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"strings"
 
 	rg "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -74,6 +75,11 @@ func main() {
 	editModeWidth := false
 	editModeHeight := false
 
+	toolOptions := []string{"Wall", "Start", "End"}
+	toolOptionsText := strings.Join(toolOptions, ";")
+	activeTool := int32(0)
+	toolDropdownOpen := false
+
 	cellSize := float32(25)
 
 	mapImage := rl.GenImageColor(width, height, rl.NewColor(240, 240, 240, 255))
@@ -143,6 +149,7 @@ func main() {
 		sidebarX := canvasWidth
 		rl.DrawRectangleRec(rl.NewRectangle(sidebarX, 0, sidebarWidth, screenHeight), rl.RayWhite)
 
+		// Width Input
 		if rg.TextBox(rl.NewRectangle(sidebarX+(10*scale), (10*scale), (80*scale), (20*scale)), &widthInputValue, 20, editModeWidth) {
 			editModeWidth = !editModeWidth
 			if editModeWidth {
@@ -151,6 +158,7 @@ func main() {
 		}
 		rg.Label(rl.NewRectangle(sidebarX+(95*scale), (10*scale), (10*scale), (20*scale)), "x")
 
+		// Height Input
 		if rg.TextBox(rl.NewRectangle(sidebarX+(110*scale), (10*scale), (80*scale), (20*scale)), &heightInputValue, 20, editModeHeight) {
 			editModeHeight = !editModeHeight
 			if editModeHeight {
@@ -158,6 +166,7 @@ func main() {
 			}
 		}
 
+		// Generate Grid Button
 		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (40*scale), (180*scale), (30*scale)), "Generate Grid") {
 			width, _ = strconv.Atoi(widthInputValue)
 			height, _ = strconv.Atoi(heightInputValue)
@@ -167,6 +176,11 @@ func main() {
 			defer rl.UnloadImage(mapImage)
 		}
 
+		// Tool Selector (text must be "opt1;opt2;..." — raygui splits on ';' and needs 2+ items)
+		rg.Label(rl.NewRectangle(sidebarX+(10*scale), (75*scale), (180*scale), (30*scale)), "Tool:")
+		if rg.DropdownBox(rl.NewRectangle(sidebarX+(10*scale), (100*scale), (180*scale), (30*scale)), toolOptionsText, &activeTool, toolDropdownOpen) {
+			toolDropdownOpen = !toolDropdownOpen
+		}
 		rl.EndDrawing()
 	}
 }
