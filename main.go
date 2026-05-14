@@ -1,8 +1,10 @@
 package main
 
 import (
+	"image/color"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	rg "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -80,6 +82,7 @@ func main() {
 	toolOptionsText := strings.Join(toolOptions, ";")
 	activeTool := int32(0)
 	toolDropdownOpen := false
+	textureNeedsUpdate := true
 
 	cellSize := float32(25)
 
@@ -147,9 +150,7 @@ func main() {
 							prevX := int(lastMousePos.X / cellSize)
 							prevY := int(lastMousePos.Y / cellSize)
 							rl.ImageDrawLine(mapImage, int32(prevX), int32(prevY), int32(x), int32(y), rl.NewColor(0, 0, 0, 255))
-							newTex := rl.LoadTextureFromImage(mapImage)
-							rl.UnloadTexture(mapTexture)
-							mapTexture = newTex
+							textureNeedsUpdate = true
 						}
 					case 1: // Start — must run on first paint frame (lastMousePos may be -1 after release)
 						if int(startPos.X) != x || int(startPos.Y) != y {
@@ -158,9 +159,7 @@ func main() {
 							}
 							rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 255, 0, 255))
 							startPos = rl.NewVector2(float32(x), float32(y))
-							newTex := rl.LoadTextureFromImage(mapImage)
-							rl.UnloadTexture(mapTexture)
-							mapTexture = newTex
+							textureNeedsUpdate = true
 						}
 					case 2: // End
 						if int(endPos.X) != x || int(endPos.Y) != y {
@@ -169,9 +168,7 @@ func main() {
 							}
 							rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(255, 0, 0, 255))
 							endPos = rl.NewVector2(float32(x), float32(y))
-							newTex := rl.LoadTextureFromImage(mapImage)
-							rl.UnloadTexture(mapTexture)
-							mapTexture = newTex
+							textureNeedsUpdate = true
 						}
 					}
 					lastMousePos = worldPos
@@ -190,6 +187,12 @@ func main() {
 		// 1. Draw Canvas
 		rl.BeginScissorMode(0, 0, int32(canvasWidth), int32(screenHeight))
 		rl.BeginMode2D(camera)
+		if textureNeedsUpdate {
+			ptr := (*color.RGBA)(mapImage.Data)
+			pixels := unsafe.Slice(ptr, width*height)
+			rl.UpdateTexture(mapTexture, pixels)
+			textureNeedsUpdate = false
+		}
 		rl.DrawTextureEx(
 			mapTexture,
 			rl.NewVector2(0, 0), // Position
