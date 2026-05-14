@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 	"strconv"
 	"strings"
@@ -95,6 +96,9 @@ func main() {
 	defer rl.UnloadTexture(mapTexture)
 	defer rl.UnloadImage(mapImage)
 
+	astar := AStar{}
+	astar.Init(width, height)
+
 	for !rl.WindowShouldClose() {
 		screenWidth := float32(rl.GetScreenWidth())
 		screenHeight := float32(rl.GetScreenHeight())
@@ -150,6 +154,7 @@ func main() {
 							prevX := int(lastMousePos.X / cellSize)
 							prevY := int(lastMousePos.Y / cellSize)
 							rl.ImageDrawLine(mapImage, int32(prevX), int32(prevY), int32(x), int32(y), rl.NewColor(0, 0, 0, 255))
+							astar.SetGridType(x, y, 1)
 							textureNeedsUpdate = true
 						}
 					case 1: // Start — must run on first paint frame (lastMousePos may be -1 after release)
@@ -159,6 +164,7 @@ func main() {
 							}
 							rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 255, 0, 255))
 							startPos = rl.NewVector2(float32(x), float32(y))
+							astar.SetGridType(x, y, 2)
 							textureNeedsUpdate = true
 						}
 					case 2: // End
@@ -168,6 +174,7 @@ func main() {
 							}
 							rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(255, 0, 0, 255))
 							endPos = rl.NewVector2(float32(x), float32(y))
+							astar.SetGridType(x, y, 3)
 							textureNeedsUpdate = true
 						}
 					}
@@ -243,6 +250,7 @@ func main() {
 				rl.UnloadImage(mapImage)
 				mapImage = rl.GenImageColor(width, height, rl.NewColor(240, 240, 240, 255))
 				mapTexture = rl.LoadTextureFromImage(mapImage)
+				astar.RebuildGrid(width, height)
 			}
 		}
 
@@ -251,6 +259,17 @@ func main() {
 		if rg.DropdownBox(rl.NewRectangle(sidebarX+(10*scale), (100*scale), (180*scale), (30*scale)), toolOptionsText, &activeTool, toolDropdownOpen) {
 			toolDropdownOpen = !toolDropdownOpen
 		}
+
+		// Calculate Path Button
+		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(40*scale)), (180*scale), (30*scale)), "Calculate Path") {
+			path := astar.CalculatePath(int(startPos.X), int(startPos.Y), int(endPos.X), int(endPos.Y))
+			fmt.Println(path)
+			for _, p := range path {
+				rl.ImageDrawPixel(mapImage, int32(p[0]), int32(p[1]), rl.NewColor(255, 255, 0, 255))
+			}
+			textureNeedsUpdate = true
+		}
+
 		rl.EndDrawing()
 	}
 }
