@@ -569,7 +569,7 @@ func main() {
 		}
 
 		// Status Label
-		rg.Label(rl.NewRectangle((10*scale), (screenHeight-(30*scale)), (180*scale), (30*scale)), "Evaluated "+strconv.Itoa(astar.GetEvaluatedCells())+" cells in "+astar.GetTimeTaken().String())
+		rg.Label(rl.NewRectangle((10*scale), (screenHeight-(30*scale)), (canvasWidth-(20*scale)), (30*scale)), "Evaluated "+strconv.Itoa(astar.GetEvaluatedCells())+" cells in "+astar.GetTimeTaken().String())
 
 		rl.EndDrawing()
 	}
