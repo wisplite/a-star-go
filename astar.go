@@ -109,6 +109,10 @@ func (a *AStar) SetHeuristic(heuristic int32) {
 		a.heuristic = func(x int, y int, endX int, endY int) float32 {
 			return float32(math.Max(float64(x-endX), float64(y-endY))) // Chebyshev distance
 		}
+	case 3:
+		a.heuristic = func(x int, y int, endX int, endY int) float32 {
+			return float32(math.Pow(float64(x-endX), 2) + math.Pow(float64(y-endY), 2)) // Squared Euclidean (extremely fast but not optimal/inadmissible)
+		}
 	}
 }
 

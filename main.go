@@ -299,7 +299,7 @@ func main() {
 	toolDropdownOpen := false
 	var tex texSync // GPU uploads: partial rects while painting; full after path resets
 
-	heuristicOptions := []string{"Manhattan", "Euclidean", "Chebyshev"}
+	heuristicOptions := []string{"Manhattan", "Euclidean", "Chebyshev", "Squared Euclidean"}
 	heuristicOptionsText := strings.Join(heuristicOptions, ";")
 	activeHeuristic := int32(0)
 	heuristicDropdownOpen := false
