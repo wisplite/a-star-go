@@ -170,6 +170,8 @@ func main() {
 		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (40*scale), (180*scale), (30*scale)), "Generate Grid") {
 			width, _ = strconv.Atoi(widthInputValue)
 			height, _ = strconv.Atoi(heightInputValue)
+			rl.UnloadTexture(mapTexture)
+			rl.UnloadImage(mapImage)
 			mapImage = rl.GenImageColor(width, height, rl.NewColor(240, 240, 240, 255))
 			mapTexture = rl.LoadTextureFromImage(mapImage)
 			defer rl.UnloadTexture(mapTexture)
