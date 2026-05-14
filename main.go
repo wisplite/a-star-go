@@ -268,7 +268,7 @@ func main() {
 	rl.InitWindow(int32(800), int32(450), "A* Visualizer")
 	defer rl.CloseWindow()
 
-	scale := rl.GetWindowScaleDPI().X
+	scale := rl.GetWindowScaleDPI().X + 0.25
 	if scale == 0 {
 		scale = 2.0 // Fallback value
 	}
@@ -339,7 +339,7 @@ func main() {
 
 			// 2. Apply proportional zoom so wheel steps get smaller as the view zooms out.
 			camera.Zoom *= float32(math.Pow(1.1, float64(wheel)))
-			if camera.Zoom < 0.01 {
+			if camera.Zoom < 0.01 && width > 2000 && height > 2000 {
 				camera.Zoom = 0.01
 			}
 
