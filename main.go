@@ -262,6 +262,7 @@ func main() {
 
 		// Calculate Path Button
 		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(40*scale)), (180*scale), (30*scale)), "Calculate Path") {
+			astar.ResetGrid()
 			path := astar.CalculatePath(int(startPos.X), int(startPos.Y), int(endPos.X), int(endPos.Y))
 			fmt.Println(path)
 			for _, p := range path {
