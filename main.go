@@ -265,7 +265,7 @@ func drawInfiniteGridLines(camera rl.Camera2D, canvasW float32, canvasH float32,
 
 func main() {
 	rl.SetConfigFlags(rl.FlagWindowResizable)
-	rl.InitWindow(int32(800), int32(600), "A* Visualizer")
+	rl.InitWindow(int32(1200), int32(800), "A* Visualizer")
 	defer rl.CloseWindow()
 
 	scale := rl.GetWindowScaleDPI().X + 0.25
@@ -303,6 +303,11 @@ func main() {
 	heuristicOptionsText := strings.Join(heuristicOptions, ";")
 	activeHeuristic := int32(0)
 	heuristicDropdownOpen := false
+
+	mazeOptions := []string{"Recursive Divison", "Iterative DFS", "Cellular Automata"}
+	mazeOptionsText := strings.Join(mazeOptions, ";")
+	activeMaze := int32(0)
+	mazeDropdownOpen := false
 
 	cellSize := float32(25)
 
@@ -512,7 +517,7 @@ func main() {
 		if lastEvaluatedNode != -1 {
 			startIndex := int(startPos.Y)*width + int(startPos.X)
 			parents := astar.GetParents()
-			pathThickness := float32(10.0) / (camera.Zoom / 0.75)
+			pathThickness := float32(16.0)
 			if pathThickness < 1 {
 				pathThickness = 1
 			}
@@ -605,12 +610,34 @@ func main() {
 		// While a dropdown list is open it overlaps controls below; those widgets are handled
 		// earlier in the frame and would otherwise steal the release-click. GuiLock skips input
 		// for other controls; DropdownBox still handles input when its editMode is true.
-		if toolDropdownOpen || heuristicDropdownOpen {
+		if toolDropdownOpen || heuristicDropdownOpen || mazeDropdownOpen {
 			rg.Lock()
 		}
 
+		// Generate Maze Button
+		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (260*scale), (180*scale), (30*scale)), "Generate Maze") {
+			astar.GenerateMaze(activeMaze)
+			astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
+			lastEvaluatedNode = -1
+			gridTypes := astar.GetGridTypes()
+			for i, gridType := range gridTypes {
+				// reset the map image
+				switch gridType {
+				case 0:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(240, 240, 240, 255))
+				case 1:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 0, 0, 255))
+				case 2:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 255, 0, 255))
+				case 3:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(255, 0, 0, 255))
+				}
+			}
+			tex.markFull()
+		}
+
 		// Reset Visualization Button
-		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (200*scale), (180*scale), (30*scale)), "Reset Visualization") {
+		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(120*scale)), (180*scale), (30*scale)), "Reset Visualization") {
 			astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
 			lastEvaluatedNode = -1
 			gridTypes := astar.GetGridTypes()
@@ -638,8 +665,8 @@ func main() {
 			speedText = strconv.Itoa(speed/10) + "%"
 		}
 		speedLabel := "Speed: " + speedText
-		rg.Label(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(145*scale)), (180*scale), (30*scale)), speedLabel)
-		newSpeed := int(rg.SliderBar(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(120*scale)), (140*scale), (30*scale)), "", "", float32(speed), 0, 1000))
+		rg.Label(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(185*scale)), (180*scale), (30*scale)), speedLabel)
+		newSpeed := int(rg.SliderBar(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(160*scale)), (140*scale), (30*scale)), "", "", float32(speed), 0, 1000))
 		if editModeSpeed {
 			if newSpeed != speed {
 				speed = newSpeed
@@ -650,7 +677,7 @@ func main() {
 			speed = newSpeed
 			speedInputValue = strconv.Itoa(speed)
 		}
-		if rg.TextBox(rl.NewRectangle(sidebarX+(160*scale), (screenHeight-(120*scale)), (30*scale), (30*scale)), &speedInputValue, 20, editModeSpeed) {
+		if rg.TextBox(rl.NewRectangle(sidebarX+(160*scale), (screenHeight-(160*scale)), (30*scale), (30*scale)), &speedInputValue, 20, editModeSpeed) {
 			editModeSpeed = !editModeSpeed
 			if editModeSpeed {
 				speedInputValue = strconv.Itoa(speed)
@@ -749,6 +776,9 @@ func main() {
 		// Status Label
 		rg.Label(rl.NewRectangle((10*scale), (screenHeight-(30*scale)), (canvasWidth-(20*scale)), (30*scale)), "Evaluated "+strconv.Itoa(astar.GetEvaluatedCells())+" cells in "+astar.GetTimeTaken().String())
 
+		// FPS counter
+		rg.Label(rl.NewRectangle((10*scale), (0*scale), (canvasWidth-(20*scale)), (30*scale)), "FPS: "+strconv.Itoa(int(rl.GetFPS())))
+
 		rg.Unlock()
 
 		// Tool Selector (text must be "opt1;opt2;..." — raygui splits on ';' and needs 2+ items)
@@ -762,6 +792,14 @@ func main() {
 			rg.Label(rl.NewRectangle(sidebarX+(10*scale), (135*scale), (180*scale), (30*scale)), "Heuristic:")
 			if rg.DropdownBox(rl.NewRectangle(sidebarX+(10*scale), (160*scale), (180*scale), (30*scale)), heuristicOptionsText, &activeHeuristic, heuristicDropdownOpen) {
 				heuristicDropdownOpen = !heuristicDropdownOpen
+			}
+		}
+
+		// Maze Selector
+		if !toolDropdownOpen && !heuristicDropdownOpen {
+			rg.Label(rl.NewRectangle(sidebarX+(10*scale), (195*scale), (180*scale), (30*scale)), "Maze:")
+			if rg.DropdownBox(rl.NewRectangle(sidebarX+(10*scale), (220*scale), (180*scale), (30*scale)), mazeOptionsText, &activeMaze, mazeDropdownOpen) {
+				mazeDropdownOpen = !mazeDropdownOpen
 			}
 		}
 
