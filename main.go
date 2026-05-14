@@ -2,6 +2,7 @@ package main
 
 import (
 	"image/color"
+	"math"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -336,8 +337,8 @@ func main() {
 			// 1. Where is the mouse in the world BEFORE zooming?
 			worldPosBefore := rl.GetScreenToWorld2D(mousePos, camera)
 
-			// 2. Apply the zoom
-			camera.Zoom += float32(wheel) * 0.1
+			// 2. Apply proportional zoom so wheel steps get smaller as the view zooms out.
+			camera.Zoom *= float32(math.Pow(1.1, float64(wheel)))
 			if camera.Zoom < 0.01 {
 				camera.Zoom = 0.01
 			}
