@@ -83,6 +83,10 @@ func main() {
 
 	cellSize := float32(25)
 
+	lastMousePos := rl.NewVector2(-1, -1)
+	startPos := rl.NewVector2(-1, -1)
+	endPos := rl.NewVector2(-1, -1)
+
 	mapImage := rl.GenImageColor(width, height, rl.NewColor(240, 240, 240, 255))
 	mapTexture := rl.LoadTextureFromImage(mapImage)
 	defer rl.UnloadTexture(mapTexture)
@@ -130,20 +134,53 @@ func main() {
 
 		// Paint logic
 		if rl.IsMouseButtonDown(rl.MouseLeftButton) {
-			worldPos := rl.GetScreenToWorld2D(rl.GetMousePosition(), camera)
-			x := int(worldPos.X / cellSize)
-			y := int(worldPos.Y / cellSize)
-			if x >= 0 && x < width && y >= 0 && y < height {
-				switch activeTool {
-				case 0: // Wall
-					rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 0, 0, 255))
-				case 1: // Start
-					rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 255, 0, 255))
-				case 2: // End
-					rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(255, 0, 0, 255))
+			mousePos := rl.GetMousePosition()
+			if int(mousePos.X) < int(canvasWidth) {
+				worldPos := rl.GetScreenToWorld2D(rl.GetMousePosition(), camera)
+				x := int(worldPos.X / cellSize)
+				y := int(worldPos.Y / cellSize)
+				if x >= 0 && x < width && y >= 0 && y < height {
+					// mapImage is one pixel per cell; drawing uses cell indices, not raw world coords.
+					switch activeTool {
+					case 0: // Wall — need previous cell for line segment
+						if lastMousePos.X != -1 && lastMousePos.Y != -1 {
+							prevX := int(lastMousePos.X / cellSize)
+							prevY := int(lastMousePos.Y / cellSize)
+							rl.ImageDrawLine(mapImage, int32(prevX), int32(prevY), int32(x), int32(y), rl.NewColor(0, 0, 0, 255))
+							newTex := rl.LoadTextureFromImage(mapImage)
+							rl.UnloadTexture(mapTexture)
+							mapTexture = newTex
+						}
+					case 1: // Start — must run on first paint frame (lastMousePos may be -1 after release)
+						if int(startPos.X) != x || int(startPos.Y) != y {
+							if startPos.X >= 0 && startPos.Y >= 0 {
+								rl.ImageDrawPixel(mapImage, int32(startPos.X), int32(startPos.Y), rl.NewColor(240, 240, 240, 255))
+							}
+							rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 255, 0, 255))
+							startPos = rl.NewVector2(float32(x), float32(y))
+							newTex := rl.LoadTextureFromImage(mapImage)
+							rl.UnloadTexture(mapTexture)
+							mapTexture = newTex
+						}
+					case 2: // End
+						if int(endPos.X) != x || int(endPos.Y) != y {
+							if endPos.X >= 0 && endPos.Y >= 0 {
+								rl.ImageDrawPixel(mapImage, int32(endPos.X), int32(endPos.Y), rl.NewColor(240, 240, 240, 255))
+							}
+							rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(255, 0, 0, 255))
+							endPos = rl.NewVector2(float32(x), float32(y))
+							newTex := rl.LoadTextureFromImage(mapImage)
+							rl.UnloadTexture(mapTexture)
+							mapTexture = newTex
+						}
+					}
+					lastMousePos = worldPos
 				}
-				mapTexture = rl.LoadTextureFromImage(mapImage)
 			}
+		}
+
+		if rl.IsMouseButtonReleased(rl.MouseLeftButton) {
+			lastMousePos = rl.NewVector2(-1, -1)
 		}
 
 		// --- DRAWING ---
