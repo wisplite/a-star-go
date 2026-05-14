@@ -290,6 +290,7 @@ func main() {
 	editModeWidth := false
 	editModeHeight := false
 	generateGridError := false
+	posError := false
 
 	toolOptions := []string{"Wall", "Start", "End", "Erase"}
 	toolOptionsText := strings.Join(toolOptions, ";")
@@ -467,6 +468,13 @@ func main() {
 			}
 		}
 
+		if posError {
+			result := rg.MessageBox(rl.NewRectangle(screenWidth/2-(100*scale), screenHeight/2-(40*scale), (200*scale), (120*scale)), "Error", "Start and end positions must be\nwithin the generated grid", "OK")
+			if result >= 0 {
+				posError = false
+			}
+		}
+
 		// Generate Grid Button
 		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (40*scale), (180*scale), (30*scale)), "Generate Grid") {
 			width, _ = strconv.Atoi(widthInputValue)
@@ -521,39 +529,43 @@ func main() {
 
 		// Calculate Path Button
 		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(40*scale)), (180*scale), (30*scale)), "Calculate Path") {
-			astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
-			astar.SetHeuristic(activeHeuristic)
-			gridTypes := astar.GetGridTypes()
-			for i, gridType := range gridTypes {
-				// reset the map image
-				switch gridType {
-				case 0:
-					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(240, 240, 240, 255))
-				case 1:
-					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 0, 0, 255))
-				case 2:
-					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 255, 0, 255))
-				case 3:
-					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(255, 0, 0, 255))
-				}
-			}
-			path := astar.CalculatePath(int(startPos.X), int(startPos.Y), int(endPos.X), int(endPos.Y))
-			closedSet := astar.GetClosedSet()
-			for i, closed := range closedSet {
-				if closed {
-					x := i % width
-					y := i / width
-					if x != int(startPos.X) || y != int(startPos.Y) {
-						rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 0, 255, 255))
+			if int(startPos.X) < 0 || int(startPos.X) >= width || int(startPos.Y) < 0 || int(startPos.Y) >= height || int(endPos.X) < 0 || int(endPos.X) >= width || int(endPos.Y) < 0 || int(endPos.Y) >= height {
+				posError = true
+			} else {
+				astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
+				astar.SetHeuristic(activeHeuristic)
+				gridTypes := astar.GetGridTypes()
+				for i, gridType := range gridTypes {
+					// reset the map image
+					switch gridType {
+					case 0:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(240, 240, 240, 255))
+					case 1:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 0, 0, 255))
+					case 2:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 255, 0, 255))
+					case 3:
+						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(255, 0, 0, 255))
 					}
 				}
-			}
-			for _, p := range path {
-				if p[0] != int(startPos.X) || p[1] != int(startPos.Y) { // we want to keep the start position green
-					rl.ImageDrawPixel(mapImage, int32(p[0]), int32(p[1]), rl.NewColor(255, 255, 0, 255))
+				path := astar.CalculatePath(int(startPos.X), int(startPos.Y), int(endPos.X), int(endPos.Y))
+				closedSet := astar.GetClosedSet()
+				for i, closed := range closedSet {
+					if closed {
+						x := i % width
+						y := i / width
+						if x != int(startPos.X) || y != int(startPos.Y) {
+							rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 0, 255, 255))
+						}
+					}
 				}
+				for _, p := range path {
+					if p[0] != int(startPos.X) || p[1] != int(startPos.Y) { // we want to keep the start position green
+						rl.ImageDrawPixel(mapImage, int32(p[0]), int32(p[1]), rl.NewColor(255, 255, 0, 255))
+					}
+				}
+				tex.markFull()
 			}
-			tex.markFull()
 		}
 
 		// Status Label
