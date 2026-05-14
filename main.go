@@ -74,6 +74,7 @@ func main() {
 	heightInputValue := "10"
 	editModeWidth := false
 	editModeHeight := false
+	generateGridError := false
 
 	toolOptions := []string{"Wall", "Start", "End"}
 	toolOptionsText := strings.Join(toolOptions, ";")
@@ -166,16 +167,25 @@ func main() {
 			}
 		}
 
+		if generateGridError {
+			result := rg.MessageBox(rl.NewRectangle(screenWidth/2-(100*scale), screenHeight/2-(40*scale), (200*scale), (120*scale)), "Error", "Width and/or height must be\nless than 16000", "OK")
+			if result >= 0 {
+				generateGridError = false
+			}
+		}
+
 		// Generate Grid Button
 		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (40*scale), (180*scale), (30*scale)), "Generate Grid") {
 			width, _ = strconv.Atoi(widthInputValue)
 			height, _ = strconv.Atoi(heightInputValue)
-			rl.UnloadTexture(mapTexture)
-			rl.UnloadImage(mapImage)
-			mapImage = rl.GenImageColor(width, height, rl.NewColor(240, 240, 240, 255))
-			mapTexture = rl.LoadTextureFromImage(mapImage)
-			defer rl.UnloadTexture(mapTexture)
-			defer rl.UnloadImage(mapImage)
+			if width > 16000 || height > 16000 {
+				generateGridError = true
+			} else {
+				rl.UnloadTexture(mapTexture)
+				rl.UnloadImage(mapImage)
+				mapImage = rl.GenImageColor(width, height, rl.NewColor(240, 240, 240, 255))
+				mapTexture = rl.LoadTextureFromImage(mapImage)
+			}
 		}
 
 		// Tool Selector (text must be "opt1;opt2;..." — raygui splits on ';' and needs 2+ items)
