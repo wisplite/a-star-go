@@ -289,7 +289,7 @@ func (a *AStar) CalculatePath(startX int, startY int, endX int, endY int) [][]in
 	return make([][]int, 0)
 }
 
-func (a *AStar) CalculatePathLive(startX int, startY int, endX int, endY int, updateChan chan int) [][]int {
+func (a *AStar) CalculatePathLive(startX int, startY int, endX int, endY int, updateChan chan int, speed *int) [][]int {
 	timer := time.Now()
 	defer func() {
 		a.timeTaken = time.Since(timer)
@@ -341,6 +341,10 @@ func (a *AStar) CalculatePathLive(startX int, startY int, endX int, endY int, up
 				priority := tentativeGScore + a.heuristic(neighborIndex%a.width, neighborIndex/a.width, endX, endY)
 				heap.Push(&a.openSet, &Item{index: neighborIndex, priority: priority, gScore: tentativeGScore})
 			}
+		}
+
+		if *speed != 1000 {
+			time.Sleep(time.Duration(1000-*speed) * time.Millisecond)
 		}
 	}
 	return make([][]int, 0)

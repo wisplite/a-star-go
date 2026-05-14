@@ -318,6 +318,9 @@ func main() {
 	updateChan := make(chan int, 100000)
 
 	autoCompute := false
+	speed := 1000
+	speedInputValue := "100"
+	editModeSpeed := false
 
 	astar := AStar{}
 	astar.Init(width, height)
@@ -553,6 +556,7 @@ func main() {
 			editModeWidth = !editModeWidth
 			if editModeWidth {
 				editModeHeight = false
+				editModeSpeed = false
 			}
 		}
 		rg.Label(rl.NewRectangle(sidebarX+(95*scale), (10*scale), (10*scale), (20*scale)), "x")
@@ -562,6 +566,7 @@ func main() {
 			editModeHeight = !editModeHeight
 			if editModeHeight {
 				editModeWidth = false
+				editModeSpeed = false
 			}
 		}
 
@@ -597,43 +602,77 @@ func main() {
 			}
 		}
 
-		// Tool Selector (text must be "opt1;opt2;..." — raygui splits on ';' and needs 2+ items)
-		rg.Label(rl.NewRectangle(sidebarX+(10*scale), (75*scale), (180*scale), (30*scale)), "Tool:")
-		if rg.DropdownBox(rl.NewRectangle(sidebarX+(10*scale), (100*scale), (180*scale), (30*scale)), toolOptionsText, &activeTool, toolDropdownOpen) {
-			toolDropdownOpen = !toolDropdownOpen
-		}
-
-		// Heuristic Selector
-		if !toolDropdownOpen {
-			rg.Label(rl.NewRectangle(sidebarX+(10*scale), (135*scale), (180*scale), (30*scale)), "Heuristic:")
-			if rg.DropdownBox(rl.NewRectangle(sidebarX+(10*scale), (160*scale), (180*scale), (30*scale)), heuristicOptionsText, &activeHeuristic, heuristicDropdownOpen) {
-				heuristicDropdownOpen = !heuristicDropdownOpen
-			}
+		// While a dropdown list is open it overlaps controls below; those widgets are handled
+		// earlier in the frame and would otherwise steal the release-click. GuiLock skips input
+		// for other controls; DropdownBox still handles input when its editMode is true.
+		if toolDropdownOpen || heuristicDropdownOpen {
+			rg.Lock()
 		}
 
 		// Reset Visualization Button
-		if !toolDropdownOpen && !heuristicDropdownOpen {
-			if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (200*scale), (180*scale), (30*scale)), "Reset Visualization") {
-				astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
-				lastEvaluatedNode = -1
-				gridTypes := astar.GetGridTypes()
-				for i, gridType := range gridTypes {
-					// reset the map image
-					switch gridType {
-					case 0:
-						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(240, 240, 240, 255))
-					case 1:
-						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 0, 0, 255))
-					case 2:
-						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 255, 0, 255))
-					case 3:
-						rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(255, 0, 0, 255))
-					}
+		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (200*scale), (180*scale), (30*scale)), "Reset Visualization") {
+			astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
+			lastEvaluatedNode = -1
+			gridTypes := astar.GetGridTypes()
+			for i, gridType := range gridTypes {
+				// reset the map image
+				switch gridType {
+				case 0:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(240, 240, 240, 255))
+				case 1:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 0, 0, 255))
+				case 2:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 255, 0, 255))
+				case 3:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(255, 0, 0, 255))
 				}
-				tex.markFull()
+			}
+			tex.markFull()
+		}
+
+		// Speed Slider
+		speedText := ""
+		if speed == 1000 {
+			speedText = "Uncapped"
+		} else {
+			speedText = strconv.Itoa(speed/10) + "%"
+		}
+		speedLabel := "Speed: " + speedText
+		rg.Label(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(145*scale)), (180*scale), (30*scale)), speedLabel)
+		newSpeed := int(rg.SliderBar(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(120*scale)), (140*scale), (30*scale)), "", "", float32(speed), 0, 1000))
+		if editModeSpeed {
+			if newSpeed != speed {
+				speed = newSpeed
+				speedInputValue = strconv.Itoa(speed)
+				editModeSpeed = false
+			}
+		} else {
+			speed = newSpeed
+			speedInputValue = strconv.Itoa(speed)
+		}
+		if rg.TextBox(rl.NewRectangle(sidebarX+(160*scale), (screenHeight-(120*scale)), (30*scale), (30*scale)), &speedInputValue, 20, editModeSpeed) {
+			editModeSpeed = !editModeSpeed
+			if editModeSpeed {
+				speedInputValue = strconv.Itoa(speed)
+				editModeWidth = false
+				editModeHeight = false
+			} else {
+				v, err := strconv.Atoi(strings.TrimSpace(speedInputValue))
+				if err != nil {
+					speedInputValue = strconv.Itoa(speed)
+				} else {
+					if v < 0 {
+						v = 0
+					} else if v > 1000 {
+						v = 1000
+					}
+					speed = v
+					speedInputValue = strconv.Itoa(speed)
+				}
 			}
 		}
 
+		// Calculate Path (Live) Button
 		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(80*scale)), (180*scale), (30*scale)), "Calculate Path (Live)") {
 			if int(startPos.X) < 0 || int(startPos.X) >= width || int(startPos.Y) < 0 || int(startPos.Y) >= height || int(endPos.X) < 0 || int(endPos.X) >= width || int(endPos.Y) < 0 || int(endPos.Y) >= height {
 				posError = true
@@ -657,7 +696,7 @@ func main() {
 				}
 				tex.markFull()
 				go func() {
-					astar.CalculatePathLive(int(startPos.X), int(startPos.Y), int(endPos.X), int(endPos.Y), updateChan)
+					astar.CalculatePathLive(int(startPos.X), int(startPos.Y), int(endPos.X), int(endPos.Y), updateChan, &speed)
 				}()
 			}
 		}
@@ -709,6 +748,22 @@ func main() {
 
 		// Status Label
 		rg.Label(rl.NewRectangle((10*scale), (screenHeight-(30*scale)), (canvasWidth-(20*scale)), (30*scale)), "Evaluated "+strconv.Itoa(astar.GetEvaluatedCells())+" cells in "+astar.GetTimeTaken().String())
+
+		rg.Unlock()
+
+		// Tool Selector (text must be "opt1;opt2;..." — raygui splits on ';' and needs 2+ items)
+		rg.Label(rl.NewRectangle(sidebarX+(10*scale), (75*scale), (180*scale), (30*scale)), "Tool:")
+		if rg.DropdownBox(rl.NewRectangle(sidebarX+(10*scale), (100*scale), (180*scale), (30*scale)), toolOptionsText, &activeTool, toolDropdownOpen) {
+			toolDropdownOpen = !toolDropdownOpen
+		}
+
+		// Heuristic Selector
+		if !toolDropdownOpen {
+			rg.Label(rl.NewRectangle(sidebarX+(10*scale), (135*scale), (180*scale), (30*scale)), "Heuristic:")
+			if rg.DropdownBox(rl.NewRectangle(sidebarX+(10*scale), (160*scale), (180*scale), (30*scale)), heuristicOptionsText, &activeHeuristic, heuristicDropdownOpen) {
+				heuristicDropdownOpen = !heuristicDropdownOpen
+			}
+		}
 
 		rl.EndDrawing()
 	}
