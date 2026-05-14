@@ -128,6 +128,24 @@ func main() {
 			camera.Target.Y -= delta.Y / camera.Zoom
 		}
 
+		// Paint logic
+		if rl.IsMouseButtonDown(rl.MouseLeftButton) {
+			worldPos := rl.GetScreenToWorld2D(rl.GetMousePosition(), camera)
+			x := int(worldPos.X / cellSize)
+			y := int(worldPos.Y / cellSize)
+			if x >= 0 && x < width && y >= 0 && y < height {
+				switch activeTool {
+				case 0: // Wall
+					rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 0, 0, 255))
+				case 1: // Start
+					rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(0, 255, 0, 255))
+				case 2: // End
+					rl.ImageDrawPixel(mapImage, int32(x), int32(y), rl.NewColor(255, 0, 0, 255))
+				}
+				mapTexture = rl.LoadTextureFromImage(mapImage)
+			}
+		}
+
 		// --- DRAWING ---
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.White)
