@@ -85,6 +85,11 @@ func main() {
 	toolDropdownOpen := false
 	textureNeedsUpdate := true
 
+	heuristicOptions := []string{"Manhattan", "Euclidean", "Chebyshev"}
+	heuristicOptionsText := strings.Join(heuristicOptions, ";")
+	activeHeuristic := int32(0)
+	heuristicDropdownOpen := false
+
 	cellSize := float32(25)
 
 	lastMousePos := rl.NewVector2(-1, -1)
@@ -251,6 +256,8 @@ func main() {
 				mapImage = rl.GenImageColor(width, height, rl.NewColor(240, 240, 240, 255))
 				mapTexture = rl.LoadTextureFromImage(mapImage)
 				astar.RebuildGrid(width, height)
+				startPos = rl.NewVector2(-1, -1)
+				endPos = rl.NewVector2(-1, -1)
 			}
 		}
 
@@ -260,13 +267,38 @@ func main() {
 			toolDropdownOpen = !toolDropdownOpen
 		}
 
+		// Heuristic Selector
+		if !toolDropdownOpen {
+			rg.Label(rl.NewRectangle(sidebarX+(10*scale), (135*scale), (180*scale), (30*scale)), "Heuristic:")
+			if rg.DropdownBox(rl.NewRectangle(sidebarX+(10*scale), (160*scale), (180*scale), (30*scale)), heuristicOptionsText, &activeHeuristic, heuristicDropdownOpen) {
+				heuristicDropdownOpen = !heuristicDropdownOpen
+			}
+		}
+
 		// Calculate Path Button
 		if rg.Button(rl.NewRectangle(sidebarX+(10*scale), (screenHeight-(40*scale)), (180*scale), (30*scale)), "Calculate Path") {
-			astar.ResetGrid()
+			astar.ResetGrid(false) // keep grid types, otherwise it will delete the board before simulating
+			astar.SetHeuristic(activeHeuristic)
+			gridTypes := astar.GetGridTypes()
+			for i, gridType := range gridTypes {
+				// reset the map image
+				switch gridType {
+				case 0:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(240, 240, 240, 255))
+				case 1:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 0, 0, 255))
+				case 2:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(0, 255, 0, 255))
+				case 3:
+					rl.ImageDrawPixel(mapImage, int32(i%width), int32(i/width), rl.NewColor(255, 0, 0, 255))
+				}
+			}
 			path := astar.CalculatePath(int(startPos.X), int(startPos.Y), int(endPos.X), int(endPos.Y))
 			fmt.Println(path)
 			for _, p := range path {
-				rl.ImageDrawPixel(mapImage, int32(p[0]), int32(p[1]), rl.NewColor(255, 255, 0, 255))
+				if p[0] != int(startPos.X) || p[1] != int(startPos.Y) { // we want to keep the start position green
+					rl.ImageDrawPixel(mapImage, int32(p[0]), int32(p[1]), rl.NewColor(255, 255, 0, 255))
+				}
 			}
 			textureNeedsUpdate = true
 		}

@@ -71,9 +71,11 @@ func (a *AStar) Init(width int, height int) {
 	}
 }
 
-func (a *AStar) ResetGrid() {
+func (a *AStar) ResetGrid(withTypes bool) {
 	for i := range a.gScores {
-		a.gridTypes[i] = 0
+		if withTypes {
+			a.gridTypes[i] = 0
+		}
 		a.gScores[i] = math.MaxFloat32
 		a.parents[i] = 0
 		a.closedSet[i] = false
@@ -91,6 +93,23 @@ func (a *AStar) RebuildGrid(width int, height int) {
 	a.height = height
 }
 
+func (a *AStar) SetHeuristic(heuristic int32) {
+	switch heuristic {
+	case 0:
+		a.heuristic = func(x int, y int, endX int, endY int) float32 {
+			return float32(math.Abs(float64(x-endX)) + math.Abs(float64(y-endY))) // Manhattan distance
+		}
+	case 1:
+		a.heuristic = func(x int, y int, endX int, endY int) float32 {
+			return float32(math.Sqrt(float64(x-endX)*float64(x-endX) + float64(y-endY)*float64(y-endY))) // Euclidean distance
+		}
+	case 2:
+		a.heuristic = func(x int, y int, endX int, endY int) float32 {
+			return float32(math.Max(float64(x-endX), float64(y-endY))) // Chebyshev distance
+		}
+	}
+}
+
 func (a *AStar) SetGridType(x int, y int, gridType byte) {
 	/*
 		0 = empty
@@ -103,6 +122,10 @@ func (a *AStar) SetGridType(x int, y int, gridType byte) {
 
 func (a *AStar) GetGridType(x int, y int) byte {
 	return a.gridTypes[y*a.width+x]
+}
+
+func (a *AStar) GetGridTypes() []byte {
+	return a.gridTypes
 }
 
 func (a *AStar) SetGScores(x int, y int, gScore float32) {
@@ -188,7 +211,6 @@ func (a *AStar) CalculatePath(startX int, startY int, endX int, endY int) [][]in
 				x, y := a.ParentIndexToXY(currentIndex%a.width, currentIndex/a.width, a.parents[currentIndex])
 				path = append(path, []int{x, y})
 			}
-			// path = append(path, []int{startX, startY}) preserve start position
 			return path
 		}
 
@@ -199,6 +221,7 @@ func (a *AStar) CalculatePath(startX int, startY int, endX int, endY int) [][]in
 				continue
 			}
 			if a.gridTypes[neighborIndex] == 1 {
+				a.gScores[neighborIndex] = math.MaxFloat32
 				continue
 			}
 			terrainCost := a.GetTerrainCost(neighborIndex%a.width, neighborIndex/a.width)
